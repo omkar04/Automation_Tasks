@@ -12,12 +12,13 @@ pipeline {
     }
 
     stages {
-        stage('Prepare SSH Key') {
+         stage('Prepare SSH Key') {
             steps {
                 script {
                     // Save the uploaded .pem file to a known location
-                    def pemFilePath = "${env.WORKSPACE}\\${params.PEM_FILE}"
-                    writeFile file: pemFilePath, text: readFile(params.PEM_FILE)
+                    writeFile file: env.PEM_FILE_PATH, text: readFile(params.PEM_FILE)
+                    // Set permissions for the .pem file (use icacls for Windows)
+                    bat "icacls ${env.PEM_FILE_PATH} /grant:r ${System.getenv('USERNAME')}:R"
                 }
             }
         }
