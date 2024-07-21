@@ -1,6 +1,11 @@
 pipeline {
     agent any
-    
+
+   parameters {
+        string(name: 'SERVER_NAME', defaultValue: '', description: 'Enter the server name or IP address')
+        file(name: 'PEM_FILE', description: 'Upload the .pem file')
+        text(name: 'PUBLIC_KEY', defaultValue: '', description: 'Enter the public key to be added to authorized_keys')
+    }
     environment {
         PEM_FILE_PATH = "${env.WORKSPACE}/${params.PEM_FILE}"
     }
