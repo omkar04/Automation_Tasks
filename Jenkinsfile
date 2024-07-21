@@ -1,21 +1,39 @@
 pipeline {
     agent any
+    
+    environment {
+        PEM_FILE_PATH = "${env.WORKSPACE}/${params.PEM_FILE}"
+    }
 
     stages {
-        stage('Build') {
+        stage('Prepare SSH Key') {
             steps {
-                echo 'Building...'
+                script {
+                    // Save the uploaded .pem file to a known location
+                    writeFile file: 'private_key.pem', text: readFile(params.PEM_FILE)
+                    sh 'chmod 400 private_key.pem'
+                }
             }
         }
-        stage('Test') {
+
+        stage('Add Public Key to Server') {
             steps {
-                echo 'Testing...'
+                script {
+                    // Use the ssh-agent plugin to handle SSH credentials
+                    sshagent (credentials: ['your-ssh-credential-id']) {
+                        sh """
+                            ssh -o StrictHostKeyChecking=no -i private_key.pem ec2-user@${params.SERVER_NAME} 'echo "${params.PUBLIC_KEY}" >> ~/.ssh/authorized_keys'
+                        """
+                    }
+                }
             }
         }
-        stage('Deploy') {
-            steps {
-                echo 'Deploying...'
-            }
+    }
+
+    post {
+        cleanup {
+            // Clean up the private key file
+            sh 'rm -f private_key.pem'
         }
     }
 }
