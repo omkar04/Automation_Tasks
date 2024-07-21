@@ -1,13 +1,14 @@
 pipeline {
     agent any
 
-   parameters {
+    parameters {
         string(name: 'SERVER_NAME', defaultValue: '', description: 'Enter the server name or IP address')
         file(name: 'PEM_FILE', description: 'Upload the .pem file')
         text(name: 'PUBLIC_KEY', defaultValue: '', description: 'Enter the public key to be added to authorized_keys')
     }
+
     environment {
-        PEM_FILE_PATH = "${env.WORKSPACE}/${params.PEM_FILE}"
+        PEM_FILE_PATH = "${params.PEM_FILE}"
     }
 
     stages {
@@ -15,8 +16,8 @@ pipeline {
             steps {
                 script {
                     // Save the uploaded .pem file to a known location
-                    writeFile file: 'private_key.pem', text: readFile(params.PEM_FILE)
-                    sh 'chmod 400 private_key.pem'
+                    def pemFilePath = "${env.WORKSPACE}\\${params.PEM_FILE}"
+                    writeFile file: pemFilePath, text: readFile(params.PEM_FILE)
                 }
             }
         }
@@ -24,12 +25,20 @@ pipeline {
         stage('Add Public Key to Server') {
             steps {
                 script {
-                    // Use the ssh-agent plugin to handle SSH credentials
-                    sshagent (credentials: ['your-ssh-credential-id']) {
-                        sh """
-                            ssh -o StrictHostKeyChecking=no -i private_key.pem ec2-user@${params.SERVER_NAME} 'echo "${params.PUBLIC_KEY}" >> ~/.ssh/authorized_keys'
-                        """
-                    }
+                    // Use PowerShell to add the public key to the remote server
+                    def pemFilePath = "${env.WORKSPACE}\\${params.PEM_FILE}"
+                    def publicKey = params.PUBLIC_KEY
+                    def serverName = params.SERVER_NAME
+
+                    bat """
+                        powershell.exe -Command \"
+                        \$pemFilePath = '${pemFilePath}';
+                        \$publicKey = '${publicKey}';
+                        \$serverName = '${serverName}';
+                        \$sshCommand = \\"echo \$publicKey >> ~/.ssh/authorized_keys\\";
+                        ssh -i \$pemFilePath ec2-user@\$serverName \$sshCommand
+                        \"
+                    """
                 }
             }
         }
@@ -38,7 +47,10 @@ pipeline {
     post {
         cleanup {
             // Clean up the private key file
-            sh 'rm -f private_key.pem'
+            script {
+                def pemFilePath = "${env.WORKSPACE}\\${params.PEM_FILE}"
+                bat "del ${pemFilePath}"
+            }
         }
     }
 }
